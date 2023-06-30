@@ -10,6 +10,11 @@
 #include <pico/bootrom.h>
 #include <pico/mutex.h>
 #include <pico/stdio.h>
+#include <pico/stdlib.h>
+
+#include "lwip/apps/httpd.h"
+#include "pico/stdlib.h"
+#include "pico/cyw43_arch.h"
 
 #include "config.h"
 #include "crc.h"
@@ -18,6 +23,7 @@
 #include "our_descriptor.h"
 #include "platform.h"
 #include "remapper.h"
+#include "cgi.h"
 
 #define CONFIG_OFFSET_IN_FLASH (PICO_FLASH_SIZE_BYTES - PERSISTED_CONFIG_SIZE)
 #define FLASH_CONFIG_IN_MEMORY (((uint8_t*) XIP_BASE) + CONFIG_OFFSET_IN_FLASH)
@@ -97,6 +103,14 @@ uint64_t get_time() {
     return time_us_64();
 }
 
+void run_server() {
+    httpd_init();
+    cgi_init();
+    printf("Http server initialized.\n");
+    // infinite loop for now
+    for (;;) {}
+}
+
 int main() {
     my_mutexes_init();
     extra_init();
@@ -105,9 +119,44 @@ int main() {
     set_mapping_from_config();
     board_init();
     tusb_init();
-    stdio_init_all();
 
+    //    stdio_init_all();
+    stdio_uart_init_full(uart0,
+                         115200,
+                         12,
+                         13);
+
+    if (cyw43_arch_init()) {
+        printf("failed to initialise\n");
+        return 1;
+    }
+    cyw43_arch_enable_sta_mode();
+    // this seems to be the best be can do using the predefined `cyw43_pm_value` macro:
+    // cyw43_wifi_pm(&cyw43_state, CYW43_PERFORMANCE_PM);
+    // however it doesn't use the `CYW43_NO_POWERSAVE_MODE` value, so we do this instead:
+    cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
+
+    printf("Connecting to WiFi...\n");
+    if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
+        printf("failed to connect.\n");
+        return 1;
+    } else {
+        printf("Connected.\n");
+
+        extern cyw43_t cyw43_state;
+        auto ip_addr = cyw43_state.netif[CYW43_ITF_STA].ip_addr.addr;
+        printf("IP Address: %lu.%lu.%lu.%lu\n", ip_addr & 0xFF, (ip_addr >> 8) & 0xFF, (ip_addr >> 16) & 0xFF, ip_addr >> 24);
+    }
+    // turn on LED to signal connected
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+
+    printf("Starting up server(s).\n");
+    httpd_init();
+    cgi_init();
+
+    printf("Doing usb stuff.\n");
     tud_sof_isr_set(sof_handler);
+    printf("tud is ok!\n");
 
     next_print = time_us_64() + 1000000;
 
