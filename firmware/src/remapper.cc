@@ -885,7 +885,7 @@ void parse_our_descriptor() {
 }
 
 void print_stats() {
-    printf("%lu %lu\n", reports_received, reports_sent);
+    printf("Received: %lu Sent: %lu\n", reports_received, reports_sent);
     reports_received = 0;
     reports_sent = 0;
 }

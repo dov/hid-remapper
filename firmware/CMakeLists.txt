@@ -24,8 +24,6 @@ add_compile_options(-Wall)
 
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=c++17>)
 
-include(credentials.cmake)
-
 add_executable(remapper
     src/main.cc
     src/cgi.cpp
@@ -42,6 +40,14 @@ add_executable(remapper
 )
 
 target_compile_definitions(remapper PUBLIC PIO_USB_DP_PIN=0)
+
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/credentials.cmake)
+    include(credentials.cmake)
+else()
+    message(WARNING "Credentials file not found, using default values!")
+    set(WIFI_SSID "SSID" CACHE INTERNAL "WiFi SSID for examples")
+    set(WIFI_PASSWORD "password" CACHE INTERNAL "WiFi password for examples")
+endif()
 
 target_compile_definitions(remapper PRIVATE
         WIFI_SSID=\"${WIFI_SSID}\"
@@ -60,7 +66,7 @@ target_include_directories(remapper PRIVATE
 target_link_libraries(remapper
     pico_stdlib
     pico_multicore
-    pico_cyw43_arch_lwip_threadsafe_background
+    pico_cyw43_arch_lwip_poll
     pico_lwip_http
     hardware_pio
     hardware_dma

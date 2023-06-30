@@ -130,11 +130,24 @@ int main() {
         printf("failed to initialise\n");
         return 1;
     }
+
+    printf("Doing usb stuff.\n");
+    tud_sof_isr_set(sof_handler);
+    printf("tud is ok!\n");
+
+    // turn on LED to signal connected
+    // This cause the USB loop to crash :-(
+    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+
+#if 0
+    // Startup the web server
     cyw43_arch_enable_sta_mode();
     // this seems to be the best be can do using the predefined `cyw43_pm_value` macro:
     // cyw43_wifi_pm(&cyw43_state, CYW43_PERFORMANCE_PM);
     // however it doesn't use the `CYW43_NO_POWERSAVE_MODE` value, so we do this instead:
+
     cyw43_wifi_pm(&cyw43_state, cyw43_pm_value(CYW43_NO_POWERSAVE_MODE, 20, 1, 1, 1));
+
 
     printf("Connecting to WiFi...\n");
     if (cyw43_arch_wifi_connect_timeout_ms(WIFI_SSID, WIFI_PASSWORD, CYW43_AUTH_WPA2_AES_PSK, 30000)) {
@@ -147,22 +160,18 @@ int main() {
         auto ip_addr = cyw43_state.netif[CYW43_ITF_STA].ip_addr.addr;
         printf("IP Address: %lu.%lu.%lu.%lu\n", ip_addr & 0xFF, (ip_addr >> 8) & 0xFF, (ip_addr >> 16) & 0xFF, ip_addr >> 24);
     }
-    // turn on LED to signal connected
-    cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
 
-    printf("Starting up server(s).\n");
+    printf("Starting up http.\n");
     httpd_init();
     cgi_init();
-
-    printf("Doing usb stuff.\n");
-    tud_sof_isr_set(sof_handler);
-    printf("tud is ok!\n");
+#endif
 
     next_print = time_us_64() + 1000000;
 
     bool led_state = false;
     uint64_t turn_led_off_after = 0;
 
+    printf("Entering while loop\n");
     while (true) {
         if (read_report()) {
             led_state = true;
